@@ -25,8 +25,9 @@ public class Robot extends TimedRobot {
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
   private SparkFlex m_SparkFlex8;
-  private SparkFlex m_SparkFlex9;
   private XboxController m_XboxController;
+  private int m_HeartbeatCounter = 0;
+  private final int kUpdateLogHeartbeatInterval = 50;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -38,10 +39,8 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Auto choices", m_chooser);
 
     m_SparkFlex8 = new SparkFlex(8, MotorType.kBrushless);
-    m_SparkFlex9.set(0);
-    m_SparkFlex9 = new SparkFlex(9, MotorType.kBrushless);
-    m_SparkFlex9.set(0);
-
+    m_SparkFlex8.set(0);
+ 
     m_XboxController = new XboxController(0);
   }
 
@@ -93,8 +92,12 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    m_SparkFlex8.set(m_XboxController.getLeftY());
-    m_SparkFlex9.set(m_XboxController.getLeftX());
+    double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
+    if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
+      System.out.println(String.format("%2.2f",speed));
+    }
+    m_SparkFlex8.set(speed);
+
   }
 
   /** This function is called once when the robot is disabled. */
@@ -105,7 +108,6 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledPeriodic() {
     m_SparkFlex8.set(0);
-    m_SparkFlex9.set(0);
   }
 
   /** This function is called once when test mode is enabled. */
@@ -123,4 +125,24 @@ public class Robot extends TimedRobot {
   /** This function is called periodically whilst in simulation. */
   @Override
   public void simulationPeriodic() {}
+
+  /** This function provides for zeroing when the value is near zero, and
+   *  a rescales so that the truncated deadband then ramps up from zero rather 
+   *  than the truncation point (epsilon).  This allows for a very precise and 
+   *  continuous funcion from -1 through 1.
+   */
+  private double deadband(double inValue, double epsilon, double pow){
+    double power = (pow <= 0) ? 1 : pow; // fix erroneous "power of" superscript, keep > 0.
+    if (Math.abs(inValue) < epsilon ) 
+      return 0;  // apply deadband
+    else {
+      // rescale from epsilon..1 to 0..1
+      double sign = inValue < 0 ? -1 : 1;
+      double slope = (1-0)/(1-epsilon); // >1
+      double reScaleLinearValue = slope * (Math.abs(inValue)-epsilon);  // result range 0..1
+      // if linear result is too punchy at low end, apply a power > 1.0. Two seems best. To keep linear, set pow to 1.0
+      double exponentialSupressionNearZero = sign * Math.pow(reScaleLinearValue,power); // result range 0..1
+      return (exponentialSupressionNearZero);
+    }
+  }
 }

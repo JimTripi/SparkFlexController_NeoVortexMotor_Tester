@@ -94,10 +94,9 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
     if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
-      System.out.println(String.format("%2.2f",speed));
+      System.out.println(String.format("%5.3f",speed));
     }
     m_SparkFlex8.set(speed);
-
   }
 
   /** This function is called once when the robot is disabled. */
@@ -138,8 +137,9 @@ public class Robot extends TimedRobot {
     else {
       // rescale from epsilon..1 to 0..1
       double sign = inValue < 0 ? -1 : 1;
-      double slope = (1-0)/(1-epsilon); // >1
-      double reScaleLinearValue = slope * (Math.abs(inValue)-epsilon);  // result range 0..1
+      final double kMinSpeedAvoidMotorSqueal = 0.03;
+      double slope = (1-kMinSpeedAvoidMotorSqueal)/(1-epsilon); // >1
+      double reScaleLinearValue = slope * (Math.abs(inValue)-epsilon)+kMinSpeedAvoidMotorSqueal;  // result range 0..1
       // if linear result is too punchy at low end, apply a power > 1.0. Two seems best. To keep linear, set pow to 1.0
       double exponentialSupressionNearZero = sign * Math.pow(reScaleLinearValue,power); // result range 0..1
       return (exponentialSupressionNearZero);

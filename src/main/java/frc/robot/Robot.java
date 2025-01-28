@@ -29,7 +29,7 @@ public class Robot extends TimedRobot {
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
   private SparkFlex m_SparkFlex8;
-  private SparkFlexConfig m_SparkFlexConfig;
+  //private SparkFlexConfig m_SparkFlexConfig;
   private AbsoluteEncoderConfig m_AbsoluteEncoderConfig;
   private XboxController m_XboxController;
   private int m_HeartbeatCounter = 0;
@@ -46,8 +46,8 @@ public class Robot extends TimedRobot {
 
     m_SparkFlex8 = new SparkFlex(8, MotorType.kBrushless);
     var m_SparkFlexConfig = new SparkFlexConfig();
-    m_SparkFlexConfig.inverted(true);
-    m_SparkFlexConfig.idleMode(IdleMode.kBrake);
+    m_SparkFlexConfig.inverted(false);
+    m_SparkFlexConfig.idleMode(IdleMode.kBrake); //IdleMode.kCoast);
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     //m_SparkFlex8.getAbsoluteEncoder().;

@@ -25,6 +25,8 @@ public class Robot extends TimedRobot {
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
   private SparkFlex m_SparkFlex8;
+  private SparkFlexConfig m_SparkFlexConfig;
+  private AbsoluteEncoderConfig m_AbsoluteEncoderConfig;
   private XboxController m_XboxController;
   private int m_HeartbeatCounter = 0;
   private final int kUpdateLogHeartbeatInterval = 50;
@@ -39,8 +41,14 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Auto choices", m_chooser);
 
     m_SparkFlex8 = new SparkFlex(8, MotorType.kBrushless);
-    m_SparkFlex8.set(0);
+    //m_SparkFlexConfig = new SparkFlexConfig();
+    //m_SparkFlex8.getAbsoluteEncoder().;
+    //m_SparkFlexConfig.absoluteEncoder.inverted(true).velocityConversionFactor(1).positionConversionFactor(1);
+    //).setSparkMaxDataPortConfig(;
+    //m_SparkFlex8.configure()
  
+    m_SparkFlex8.set(0);
+    
     m_XboxController = new XboxController(0);
   }
 

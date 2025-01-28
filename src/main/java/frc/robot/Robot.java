@@ -10,8 +10,12 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.XboxController;
 import com.revrobotics.*;
 import com.revrobotics.spark.*;
-import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.*;
+import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.config.SparkFlexConfig;
 
 /**
  * The methods in this class are called automatically corresponding to each mode, as described in
@@ -41,14 +45,17 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Auto choices", m_chooser);
 
     m_SparkFlex8 = new SparkFlex(8, MotorType.kBrushless);
-    //m_SparkFlexConfig = new SparkFlexConfig();
+    var m_SparkFlexConfig = new SparkFlexConfig();
+    m_SparkFlexConfig.inverted(true);
+    m_SparkFlexConfig.idleMode(IdleMode.kBrake);
+    m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+
     //m_SparkFlex8.getAbsoluteEncoder().;
     //m_SparkFlexConfig.absoluteEncoder.inverted(true).velocityConversionFactor(1).positionConversionFactor(1);
     //).setSparkMaxDataPortConfig(;
     //m_SparkFlex8.configure()
  
-    m_SparkFlex8.set(0);
-    
+    m_SparkFlex8.set(0);    
     m_XboxController = new XboxController(0);
   }
 

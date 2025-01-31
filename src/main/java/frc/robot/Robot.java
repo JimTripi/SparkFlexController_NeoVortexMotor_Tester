@@ -16,6 +16,7 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.*;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkFlexConfig;
+import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 
 /**
  * The methods in this class are called automatically corresponding to each mode, as described in
@@ -30,11 +31,20 @@ public class Robot extends TimedRobot {
 
   private SparkFlex m_SparkFlex8;
   //private SparkFlexConfig m_SparkFlexConfig;
-  private AbsoluteEncoderConfig m_AbsoluteEncoderConfig;
+ // private AbsoluteEncoderConfig m_AbsoluteEncoderConfig;
   private XboxController m_XboxController;
   private int m_HeartbeatCounter = 0;
   private final int kUpdateLogHeartbeatInterval = 50;
 
+  public enum algea_shooter {
+      INIT,
+      INTAKE_ZERO,
+      SHOOT,
+      UP_90,
+      }
+
+  public algea_shooter armPOS;
+  
   /**
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
@@ -48,15 +58,13 @@ public class Robot extends TimedRobot {
     var m_SparkFlexConfig = new SparkFlexConfig();
     m_SparkFlexConfig.inverted(false);
     m_SparkFlexConfig.idleMode(IdleMode.kBrake); //IdleMode.kCoast);
+    // m_SparkFlexConfig.closedLoop.feedbackSensor(FeedbackSensor.kPrimaryEncoder);
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
-
-    //m_SparkFlex8.getAbsoluteEncoder().;
-    //m_SparkFlexConfig.absoluteEncoder.inverted(true).velocityConversionFactor(1).positionConversionFactor(1);
-    //).setSparkMaxDataPortConfig(;
-    //m_SparkFlex8.configure()
- 
+    //RelativeEncoder encoder8 = m_SparkFlex8.getEncoder(); // Not sure why this did not work
+    
     m_SparkFlex8.set(0);    
     m_XboxController = new XboxController(0);
+    armPOS = algea_shooter.INIT;
   }
 
   /**
@@ -84,6 +92,7 @@ public class Robot extends TimedRobot {
     m_autoSelected = m_chooser.getSelected();
     // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
     System.out.println("Auto selected: " + m_autoSelected);
+ 
   }
 
   /** This function is called periodically during autonomous. */
@@ -102,16 +111,59 @@ public class Robot extends TimedRobot {
 
   /** This function is called once when teleop is enabled. */
   @Override
-  public void teleopInit() {}
+  public void teleopInit() {
+  
+  armPOS = algea_shooter.INIT;
+    
+  }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
-    if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
-      System.out.println(String.format("%5.3f",speed));
+
+    if (armPOS == algea_shooter.INIT) {
+      System.out.println("RESET - Going to Zero Position");
+      Algea_Reset();
     }
-    m_SparkFlex8.set(speed);
+    
+    else {
+    double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
+    
+    if(m_XboxController.getYButtonPressed()) {
+      m_SparkFlex8.getEncoder().setPosition(0);
+      System.out.println("Position Set to Zero");
+    }
+
+    if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
+      System.out.println("Motor Speed:" + String.format("%5.3f",speed));
+      System.out.println("Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
+    
+    }
+    
+    if (m_XboxController.getXButtonPressed()) {
+      
+      m_SparkFlex8.set(0);
+      }
+      else { m_SparkFlex8.set(speed*0.5);
+      }
+  }
+
+}
+  public void Algea_Reset() {
+
+        // If TRUE Running for First Time
+    if ((armPOS == algea_shooter.INIT) && (!m_XboxController.getYButtonPressed())) {
+      m_SparkFlex8.set(0.10);
+      System.out.println("Entering RESET Code");
+    }
+    else {
+      System.out.println("Hit Sensor for Reset");
+      m_SparkFlex8.set(0.0);
+      m_SparkFlex8.getEncoder().setPosition(0);
+      System.out.println("Init Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
+      armPOS = algea_shooter.INTAKE_ZERO;
+    }
+    
   }
 
   /** This function is called once when the robot is disabled. */

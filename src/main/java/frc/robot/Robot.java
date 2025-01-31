@@ -8,8 +8,13 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.XboxController;
+
+import javax.lang.model.util.ElementScanner14;
+import javax.sound.sampled.Control;
+
 import com.revrobotics.*;
 import com.revrobotics.spark.*;
+import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
@@ -29,9 +34,11 @@ public class Robot extends TimedRobot {
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
   private SparkFlex m_SparkFlex8;
-  //private SparkFlexConfig m_SparkFlexConfig;
-  private AbsoluteEncoderConfig m_AbsoluteEncoderConfig;
+  private SparkClosedLoopController m_ClosedLoopController;
+  private double m_TargetPosition = 0; // For absoluteEncoder is [0..1)
+
   private XboxController m_XboxController;
+
   private int m_HeartbeatCounter = 0;
   private final int kUpdateLogHeartbeatInterval = 50;
 
@@ -45,18 +52,31 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Auto choices", m_chooser);
 
     m_SparkFlex8 = new SparkFlex(8, MotorType.kBrushless);
+   
     var m_SparkFlexConfig = new SparkFlexConfig();
     m_SparkFlexConfig.inverted(false);
     m_SparkFlexConfig.idleMode(IdleMode.kBrake); //IdleMode.kCoast);
+    m_SparkFlexConfig.absoluteEncoder.positionConversionFactor(1); 
+    m_SparkFlexConfig.absoluteEncoder.velocityConversionFactor(1); 
+    m_SparkFlexConfig.absoluteEncoder.zeroOffset(0);
+    m_SparkFlexConfig.absoluteEncoder.zeroCentered(false);
+    m_SparkFlexConfig.signals.primaryEncoderPositionPeriodMs(5);
+    m_SparkFlexConfig.signals.primaryEncoderVelocityPeriodMs(5);
+    m_SparkFlexConfig.closedLoop.pidf(0.2,0,0,0);
+    m_SparkFlexConfig.closedLoop.velocityFF(1/565);
+    m_SparkFlexConfig.closedLoop.outputRange(-1,1);
+    m_SparkFlexConfig.closedLoop.maxMotion.maxVelocity(10);  // NeoVortex Max RPM = 6784
+    m_SparkFlexConfig.closedLoop.maxMotion.maxAcceleration(1);  // RPM/sec
+    m_SparkFlexConfig.closedLoop.maxMotion.allowedClosedLoopError(0.005);
+    //m_SparkFlexConfig.absoluteEncoder.VoltageCompensationEnabled(true);
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
-    //m_SparkFlex8.getAbsoluteEncoder().;
-    //m_SparkFlexConfig.absoluteEncoder.inverted(true).velocityConversionFactor(1).positionConversionFactor(1);
-    //).setSparkMaxDataPortConfig(;
-    //m_SparkFlex8.configure()
- 
+    printMotorAndEncoderConfiguration();
+
     m_SparkFlex8.set(0);    
     m_XboxController = new XboxController(0);
+
+    m_ClosedLoopController = m_SparkFlex8.getClosedLoopController();
   }
 
   /**
@@ -84,20 +104,31 @@ public class Robot extends TimedRobot {
     m_autoSelected = m_chooser.getSelected();
     // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
     System.out.println("Auto selected: " + m_autoSelected);
+
+    m_TargetPosition = m_SparkFlex8.getAbsoluteEncoder().getPosition();
   }
 
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
+
+    if (m_HeartbeatCounter++ % 50*60*60 == 0) {  //every 60 seconds
+      System.out.println("Reset (Lower) Position");
+      m_TargetPosition = 0.0;
     }
+    else if (m_HeartbeatCounter % 50*60*5 == 0) {  //every 5 seconds
+      System.out.println("Raise Position");
+      m_TargetPosition += 0.05;
+    }
+      
+    // Wrap absolute range [0..1)
+    if (m_TargetPosition < 0) m_TargetPosition = 1.0 - m_TargetPosition; 
+    else if (m_TargetPosition >= 1.0) m_TargetPosition -= 1.0;
+
+    System.out.println("Target: " + String.format("%5.3f ",m_TargetPosition) + 
+                      " Current: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition()));
+    //m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl); //ControlType.kPosition);
+    m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kPosition);
   }
 
   /** This function is called once when teleop is enabled. */
@@ -109,7 +140,15 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
     if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
-      System.out.println(String.format("%5.3f",speed));
+      
+      // The absolute encoder is working with SparkFlex controller, NeoVortex motor, 
+      // and REV-11-2853 Spark Flex Data Port Breakout Cable.  The motor needs a load too, 
+      // for this exampe had a 3:1 gearbox on it. 
+      System.out.println(
+        "SpeedCmd: " + String.format("%5.3f ",speed) +
+        " DriveShaft Absolute Vel: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getVelocity()) +
+        " DriveShaft Absolute Pos: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition())
+        );
     }
     m_SparkFlex8.set(speed);
   }
@@ -139,6 +178,20 @@ public class Robot extends TimedRobot {
   /** This function is called periodically whilst in simulation. */
   @Override
   public void simulationPeriodic() {}
+
+  private void printMotorAndEncoderConfiguration() {
+    System.out.println("configAccessor");
+    System.out.println("  Inverted: " + m_SparkFlex8.configAccessor.getInverted());
+    System.out.println("  IdleMode: " + m_SparkFlex8.configAccessor.getIdleMode());
+    System.out.println("  ClosedLoopRampRate: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.getClosedLoopRampRate()));
+    System.out.println("  OpenLoopRampRate: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.getOpenLoopRampRate()));
+    System.out.println("  VoltageCompensation: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.getVoltageCompensation()));
+    System.out.println("  VoltageCompensationEnabled: " + m_SparkFlex8.configAccessor.getVoltageCompensationEnabled());
+    System.out.println("configAccessor.AbsoluteEncoder");
+    System.out.println("  ZeroOffset: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.absoluteEncoder.getZeroOffset()));
+    System.out.println("  PosConvFactor: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.absoluteEncoder.getPositionConversionFactor()));
+    System.out.println("  VelConvFactor: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.absoluteEncoder.getVelocityConversionFactor()));
+  }
 
   /** This function provides for zeroing when the value is near zero, and
    *  a rescales so that the truncated deadband then ramps up from zero rather 

@@ -40,7 +40,9 @@ public class Robot extends TimedRobot {
   private XboxController m_XboxController;
 
   private int m_HeartbeatCounter = 0;
-  private final int kUpdateLogHeartbeatInterval = 50;
+  private int m_ResetCounter = 0;
+  private int m_IncrementCounter = 0;
+  private final int kHearbeatsPerSecond = 50;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -65,8 +67,8 @@ public class Robot extends TimedRobot {
     m_SparkFlexConfig.closedLoop.pidf(0.2,0,0,0);
     m_SparkFlexConfig.closedLoop.velocityFF(1/565);
     m_SparkFlexConfig.closedLoop.outputRange(-1,1);
-    m_SparkFlexConfig.closedLoop.maxMotion.maxVelocity(10);  // NeoVortex Max RPM = 6784
-    m_SparkFlexConfig.closedLoop.maxMotion.maxAcceleration(1);  // RPM/sec
+    m_SparkFlexConfig.closedLoop.maxMotion.maxVelocity(100);  // NeoVortex Max RPM = 6784
+    m_SparkFlexConfig.closedLoop.maxMotion.maxAcceleration(10);  // RPM/sec
     m_SparkFlexConfig.closedLoop.maxMotion.allowedClosedLoopError(0.005);
     //m_SparkFlexConfig.absoluteEncoder.VoltageCompensationEnabled(true);
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
@@ -106,29 +108,36 @@ public class Robot extends TimedRobot {
     System.out.println("Auto selected: " + m_autoSelected);
 
     m_TargetPosition = m_SparkFlex8.getAbsoluteEncoder().getPosition();
+    m_HeartbeatCounter = 0;
   }
 
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
 
-    if (m_HeartbeatCounter++ % 50*60*60 == 0) {  //every 60 seconds
-      System.out.println("Reset (Lower) Position");
+    m_HeartbeatCounter++;
+
+    if (m_ResetCounter++ > kHearbeatsPerSecond*30) {  //every 30 seconds
+      m_ResetCounter = 0;
+      System.out.println(m_HeartbeatCounter + " Reset (Lower) Position");
       m_TargetPosition = 0.0;
     }
-    else if (m_HeartbeatCounter % 50*60*5 == 0) {  //every 5 seconds
-      System.out.println("Raise Position");
+    if (m_IncrementCounter++ > kHearbeatsPerSecond*5) {  //every 3 seconds
+      m_IncrementCounter = 0;
+      System.out.println(m_HeartbeatCounter + " Raise Position");
       m_TargetPosition += 0.05;
     }
       
     // Wrap absolute range [0..1)
-    if (m_TargetPosition < 0) m_TargetPosition = 1.0 - m_TargetPosition; 
+    if (m_TargetPosition < 0) m_TargetPosition = 1.0 + m_TargetPosition; 
     else if (m_TargetPosition >= 1.0) m_TargetPosition -= 1.0;
 
-    System.out.println("Target: " + String.format("%5.3f ",m_TargetPosition) + 
-                      " Current: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition()));
-    //m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl); //ControlType.kPosition);
-    m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kPosition);
+    if (m_ResetCounter % kHearbeatsPerSecond == 0) { 
+      System.out.println(m_HeartbeatCounter + " Target: " + String.format("%5.3f ",m_TargetPosition) + 
+                        " Current: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition()));
+      //m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl); //ControlType.kPosition);
+      m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kPosition);
+    }
   }
 
   /** This function is called once when teleop is enabled. */
@@ -139,7 +148,7 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
     double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
-    if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
+    if (m_ResetCounter++ % kHearbeatsPerSecond == 0) {
       
       // The absolute encoder is working with SparkFlex controller, NeoVortex motor, 
       // and REV-11-2853 Spark Flex Data Port Breakout Cable.  The motor needs a load too, 

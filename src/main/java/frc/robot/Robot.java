@@ -9,9 +9,6 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.XboxController;
 
-import javax.lang.model.util.ElementScanner14;
-import javax.sound.sampled.Control;
-
 import com.revrobotics.*;
 import com.revrobotics.spark.*;
 import com.revrobotics.spark.SparkBase.ControlType;
@@ -42,9 +39,12 @@ public class Robot extends TimedRobot {
   private int m_HeartbeatCounter = 0;
   private int m_ResetCounter = 0;
   private int m_SecondCounter = 0;
-  private int m_10SecCounter = 0;
   private final int kHearbeatsPerSecond = 50;
-  private final double kPositionConversionFactor = 3;
+  
+  // Uncomment each to witness physical behavior change.
+  //private final double kPositionConversionFactor = 1; // 1 Revolultion
+  //private final double kPositionConversionFactor = 3; // 3:1 gearbox, thus 1 motor revolution = 1/3 encoder shaft revolution
+  private final double kPositionConversionFactor = 30; // Theoretical elevator mechanism travel of 10x encoder revolutions through 3:1 gearbox, thus 1/30 encoder shaft rev per motor rev.
 
   // This test program is tuned for the following setup:
   //  SparkFlex Controller
@@ -68,18 +68,17 @@ public class Robot extends TimedRobot {
     m_SparkFlexConfig.idleMode(IdleMode.kBrake); //IdleMode.kCoast);
     m_SparkFlexConfig.absoluteEncoder.positionConversionFactor(kPositionConversionFactor); // is a factor multiplied against absolute encoder's [0..1) when set to 1 will be returned by m_SparkFlex8.getAbsoluteEncoder().getPosition().  Use 360 to get degrees from abs zero.
     m_SparkFlexConfig.absoluteEncoder.velocityConversionFactor(1); 
-    m_SparkFlexConfig.absoluteEncoder.zeroOffset(0);
+    m_SparkFlexConfig.absoluteEncoder.zeroOffset(0.2946392);  // Get from Rev Hardware Client > Hardware > Absolute Encoder > twist motor to desired "zero" position > click Zero Offset Button > take this value from Zero Offset field which should be between [0..1).
     m_SparkFlexConfig.absoluteEncoder.zeroCentered(false);
     m_SparkFlexConfig.signals.primaryEncoderPositionPeriodMs(5);
     m_SparkFlexConfig.signals.primaryEncoderVelocityPeriodMs(5);
-    m_SparkFlexConfig.closedLoop.pidf(0.2,0,0,0);
+    m_SparkFlexConfig.closedLoop.pidf(0.2,0,0,0);  
     m_SparkFlexConfig.closedLoop.velocityFF(1/565);
     m_SparkFlexConfig.closedLoop.outputRange(-1,1);
     m_SparkFlexConfig.closedLoop.maxMotion.maxVelocity(6784);  // NeoVortex Max RPM = 6784
     m_SparkFlexConfig.closedLoop.maxMotion.maxAcceleration(1000);  // RPM/sec
     m_SparkFlexConfig.closedLoop.maxMotion.allowedClosedLoopError(kPositionConversionFactor*0.005);
-    //m_SparkFlexConfig.closedLoop.maxMotion.allowedClosedLoopError(0.005);
-    //m_SparkFlexConfig.absoluteEncoder.VoltageCompensationEnabled(true);
+    //m_SparkFlexConfig.absoluteEncoder.VoltageCompensationEnabled(true);  // don't seem to exist, can't find it.
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
     printMotorAndEncoderConfiguration();
@@ -113,18 +112,16 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousInit() {
     m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
+     m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
     System.out.println("Auto selected: " + m_autoSelected);
 
-    m_TargetPosition = m_SparkFlex8.getAbsoluteEncoder().getPosition();
+    m_TargetPosition = 0; // m_SparkFlex8.getAbsoluteEncoder().getPosition();
     m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl);  // in units of rotations
     System.out.println(
         "Initial:: " +
         " Target: " + String.format("%5.3f ",m_TargetPosition) + 
         " Current: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition()));
-    //m_TargetPosition = kPositionConversionFactor / 4;
     m_HeartbeatCounter = 0;
-    //m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl);  // in units of rotations
   }
 
   /** This function is called periodically during autonomous. */
@@ -137,7 +134,6 @@ public class Robot extends TimedRobot {
     if (m_HeartbeatCounter % kHearbeatsPerSecond == 0) {   // evert one second
       m_SecondCounter++;
       if (m_SecondCounter % 5 == 0) {  // every 5 seconds
-        m_10SecCounter++;
         m_TargetPosition += kPositionConversionFactor / 4;  // Verified that minus equals works too. 
 
         if (m_TargetPosition < 0) m_TargetPosition = kPositionConversionFactor + m_TargetPosition; 
@@ -148,11 +144,6 @@ public class Robot extends TimedRobot {
         m_SecondCounter + 
         " Target: " + String.format("%5.3f ",m_TargetPosition) + 
         " Current: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition()));
-
-      //      m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kPosition);  // in units of rotations
-
-      //m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl); //ControlType.kPosition);
-    //   m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kPosition);
     }
   }
 

@@ -44,7 +44,13 @@ public class Robot extends TimedRobot {
   private int m_SecondCounter = 0;
   private int m_10SecCounter = 0;
   private final int kHearbeatsPerSecond = 50;
-  private final double kPositionConversionFactor = 1;
+  private final double kPositionConversionFactor = 3;
+
+  // This test program is tuned for the following setup:
+  //  SparkFlex Controller
+  //  Neo Vortex motor
+  //  Rev-11-2853 Spark Flex Data Port Breakout Cable
+  //  3:1 gearbox as load.
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -66,12 +72,13 @@ public class Robot extends TimedRobot {
     m_SparkFlexConfig.absoluteEncoder.zeroCentered(false);
     m_SparkFlexConfig.signals.primaryEncoderPositionPeriodMs(5);
     m_SparkFlexConfig.signals.primaryEncoderVelocityPeriodMs(5);
-    m_SparkFlexConfig.closedLoop.pidf(0.4,0,0,0);
+    m_SparkFlexConfig.closedLoop.pidf(0.2,0,0,0);
     m_SparkFlexConfig.closedLoop.velocityFF(1/565);
     m_SparkFlexConfig.closedLoop.outputRange(-1,1);
-    m_SparkFlexConfig.closedLoop.maxMotion.maxVelocity(300);  // NeoVortex Max RPM = 6784
-    m_SparkFlexConfig.closedLoop.maxMotion.maxAcceleration(100);  // RPM/sec
+    m_SparkFlexConfig.closedLoop.maxMotion.maxVelocity(6784);  // NeoVortex Max RPM = 6784
+    m_SparkFlexConfig.closedLoop.maxMotion.maxAcceleration(1000);  // RPM/sec
     m_SparkFlexConfig.closedLoop.maxMotion.allowedClosedLoopError(kPositionConversionFactor*0.005);
+    //m_SparkFlexConfig.closedLoop.maxMotion.allowedClosedLoopError(0.005);
     //m_SparkFlexConfig.absoluteEncoder.VoltageCompensationEnabled(true);
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
@@ -111,6 +118,10 @@ public class Robot extends TimedRobot {
 
     m_TargetPosition = m_SparkFlex8.getAbsoluteEncoder().getPosition();
     m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl);  // in units of rotations
+    System.out.println(
+        "Initial:: " +
+        " Target: " + String.format("%5.3f ",m_TargetPosition) + 
+        " Current: " + String.format("%5.3f ",m_SparkFlex8.getAbsoluteEncoder().getPosition()));
     //m_TargetPosition = kPositionConversionFactor / 4;
     m_HeartbeatCounter = 0;
     //m_ClosedLoopController.setReference(m_TargetPosition, ControlType.kMAXMotionPositionControl);  // in units of rotations
@@ -123,11 +134,11 @@ public class Robot extends TimedRobot {
     
     m_HeartbeatCounter++;
 
-    if (m_HeartbeatCounter % kHearbeatsPerSecond == 0) { 
+    if (m_HeartbeatCounter % kHearbeatsPerSecond == 0) {   // evert one second
       m_SecondCounter++;
-      if (m_SecondCounter % 10 == 0) {
+      if (m_SecondCounter % 5 == 0) {  // every 5 seconds
         m_10SecCounter++;
-        m_TargetPosition += kPositionConversionFactor / 4;
+        m_TargetPosition += kPositionConversionFactor / 4;  // Verified that minus equals works too. 
 
         if (m_TargetPosition < 0) m_TargetPosition = kPositionConversionFactor + m_TargetPosition; 
         else if (m_TargetPosition >= kPositionConversionFactor) m_TargetPosition -= kPositionConversionFactor;

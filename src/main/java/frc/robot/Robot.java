@@ -30,8 +30,6 @@ public class Robot extends TimedRobot {
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
   private SparkFlex m_SparkFlex8;
-  //private SparkFlexConfig m_SparkFlexConfig;
- // private AbsoluteEncoderConfig m_AbsoluteEncoderConfig;
   private XboxController m_XboxController;
   private int m_HeartbeatCounter = 0;
   private final int kUpdateLogHeartbeatInterval = 50;
@@ -58,13 +56,20 @@ public class Robot extends TimedRobot {
     var m_SparkFlexConfig = new SparkFlexConfig();
     m_SparkFlexConfig.inverted(false);
     m_SparkFlexConfig.idleMode(IdleMode.kBrake); //IdleMode.kCoast);
+    m_SparkFlexConfig.absoluteEncoder.zeroOffset(0.5345672/*0.7794731*/); // O'Clock Position
+    
     // m_SparkFlexConfig.closedLoop.feedbackSensor(FeedbackSensor.kPrimaryEncoder);
+
     m_SparkFlex8.configure(m_SparkFlexConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+   
     //RelativeEncoder encoder8 = m_SparkFlex8.getEncoder(); // Not sure why this did not work
     
+    
+
     m_SparkFlex8.set(0);    
     m_XboxController = new XboxController(0);
     armPOS = algea_shooter.INIT;
+    printMotorAndEncoderConfiguration();
   }
 
   /**
@@ -120,12 +125,10 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-
     if (armPOS == algea_shooter.INIT) {
       System.out.println("RESET - Going to Zero Position");
       Algea_Reset();
     }
-    
     else {
     double speed = deadband(-m_XboxController.getLeftY(),0.06,2);
     
@@ -137,7 +140,7 @@ public class Robot extends TimedRobot {
     if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
       System.out.println("Motor Speed:" + String.format("%5.3f",speed));
       System.out.println("Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
-    
+      
     }
     
     if (m_XboxController.getXButtonPressed()) {
@@ -151,18 +154,40 @@ public class Robot extends TimedRobot {
 }
   public void Algea_Reset() {
 
-        // If TRUE Running for First Time
-    if ((armPOS == algea_shooter.INIT) && (!m_XboxController.getYButtonPressed())) {
-      m_SparkFlex8.set(0.10);
-      System.out.println("Entering RESET Code");
+    //if (angle >= 90 && angle <= 180) 
+    double Slack_Range = 0.05; 
+    if (armPOS == algea_shooter.INIT) { 
+      if ((m_SparkFlex8.getAbsoluteEncoder().getPosition() <= ( 0.0 - Slack_Range)) ||
+        ( m_SparkFlex8.getAbsoluteEncoder().getPosition() >= (0.0 + Slack_Range))) {
+        m_SparkFlex8.set(0.10);
+        System.out.println("Position is:"+ String.format("%4.2f", m_SparkFlex8.getAbsoluteEncoder().getPosition())); 
+        System.out.println("Going to Zero Position");
+        printMotorAndEncoderConfiguration();
+      }
+      else {
+        System.out.println("Hit Zero Position");
+        m_SparkFlex8.set(0.0);
+        // m_SparkFlex8.getAbsoluteEncoder().setPosition(0);
+        System.out.println("Position is:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
+              
+        armPOS = algea_shooter.INTAKE_ZERO;
+        printMotorAndEncoderConfiguration();
+      }
     }
-    else {
-      System.out.println("Hit Sensor for Reset");
-      m_SparkFlex8.set(0.0);
-      m_SparkFlex8.getEncoder().setPosition(0);
-      System.out.println("Init Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
-      armPOS = algea_shooter.INTAKE_ZERO;
-    }
+
+
+    //     // If TRUE Running for First Time Set Zero with Y Button
+    // if ((armPOS == algea_shooter.INIT) && (!m_XboxController.getYButtonPressed())) {
+    //   m_SparkFlex8.set(0.10);
+    //   System.out.println("Entering RESET Code");
+    // }
+    // else {
+    //   System.out.println("Hit Sensor for Reset");
+    //   m_SparkFlex8.set(0.0);
+    //   m_SparkFlex8.getEncoder().setPosition(0);
+    //   System.out.println("Init Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
+    //   armPOS = algea_shooter.INTAKE_ZERO;
+    // }
     
   }
 
@@ -212,4 +237,21 @@ public class Robot extends TimedRobot {
       return (exponentialSupressionNearZero);
     }
   }
+
+  private void printMotorAndEncoderConfiguration() {
+    System.out.println("configAccessor");
+    System.out.println("  Inverted: " + m_SparkFlex8.configAccessor.getInverted());
+    System.out.println("  IdleMode: " + m_SparkFlex8.configAccessor.getIdleMode());
+    System.out.println("  ClosedLoopRampRate: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.getClosedLoopRampRate()));
+    System.out.println("  OpenLoopRampRate: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.getOpenLoopRampRate()));
+    System.out.println("  VoltageCompensation: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.getVoltageCompensation()));
+    System.out.println("  VoltageCompensationEnabled: " + m_SparkFlex8.configAccessor.getVoltageCompensationEnabled());
+    System.out.println("configAccessor.AbsoluteEncoder");
+    System.out.println("  ZeroOffset: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.absoluteEncoder.getZeroOffset()));
+    System.out.println("  PosConvFactor: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.absoluteEncoder.getPositionConversionFactor()));
+    System.out.println("  VelConvFactor: " + String.format("%5.3f ",  m_SparkFlex8.configAccessor.absoluteEncoder.getVelocityConversionFactor()));
+    System.out.println("  AbsoluteEncPosition: " + String.format("%5.3f ",  m_SparkFlex8.getAbsoluteEncoder().getPosition()));
+  }
+
+
 }

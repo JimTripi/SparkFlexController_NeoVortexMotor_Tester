@@ -134,13 +134,13 @@ public class Robot extends TimedRobot {
     
     if(m_XboxController.getYButtonPressed()) {
       m_SparkFlex8.getEncoder().setPosition(0);
-      System.out.println("Position Set to Zero");
+    //  System.out.println("Position Set to Zero");
     }
 
     if (m_HeartbeatCounter++ % kUpdateLogHeartbeatInterval == 0) {
-      System.out.println("Motor Speed:" + String.format("%5.3f",speed));
-      System.out.println("Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
-      
+  //    System.out.println("Motor Speed:" + String.format("%5.3f",speed));
+ //     System.out.println("Position:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
+ //     System.out.println("XBox Position is:"+ String.format("%4.2f", m_SparkFlex8.getAbsoluteEncoder().getPosition()));
     }
     
     if (m_XboxController.getXButtonPressed()) {
@@ -153,25 +153,32 @@ public class Robot extends TimedRobot {
 
 }
   public void Algea_Reset() {
+    double currentPosition = m_SparkFlex8.getAbsoluteEncoder().getPosition();
 
-    //if (angle >= 90 && angle <= 180) 
-    double Slack_Range = 0.05; 
+    double Slack_Range = 0.0025; /*Changed from 0.05 to 0.0025 to reduce slack */
+
+   // System.out.println("Position is:"+ String.format("%4.2f", currentPosition)); 
+
     if (armPOS == algea_shooter.INIT) { 
-      if ((m_SparkFlex8.getAbsoluteEncoder().getPosition() <= ( 0.0 - Slack_Range)) ||
-        ( m_SparkFlex8.getAbsoluteEncoder().getPosition() >= (0.0 + Slack_Range))) {
-        m_SparkFlex8.set(0.10);
+      if ((currentPosition <= ( 0.0 - Slack_Range)) ||
+        (currentPosition >= (0.0 + Slack_Range))) {
+
+        if (currentPosition < 0.5) {
+          m_SparkFlex8.set(-0.10);
+        }
+        else {
+          m_SparkFlex8.set(0.10);
+        }
+
         System.out.println("Position is:"+ String.format("%4.2f", m_SparkFlex8.getAbsoluteEncoder().getPosition())); 
         System.out.println("Going to Zero Position");
-        printMotorAndEncoderConfiguration();
       }
       else {
         System.out.println("Hit Zero Position");
         m_SparkFlex8.set(0.0);
-        // m_SparkFlex8.getAbsoluteEncoder().setPosition(0);
         System.out.println("Position is:"+ String.format("%4.2f", m_SparkFlex8.getEncoder().getPosition())); 
               
         armPOS = algea_shooter.INTAKE_ZERO;
-        printMotorAndEncoderConfiguration();
       }
     }
 
